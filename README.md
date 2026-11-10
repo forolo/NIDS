@@ -258,7 +258,7 @@ L'audit de fuite (`src/eval/audit_fuite.py`, rapport `reports/audit_fuite.md`) a
 - Le découpage est chronologique, jamais aléatoire.
 - Les étapes qui lisent le test (évaluation, XAI, robustesse) ne doivent pas servir à régler le modèle. Le réglage se fait sur la validation.<br>
 
-### ANNEXE C  ALGОRITHMES DЕS MОDULЕS EN PSEUDО-СОDE <br>
+### ALGОRITHMES DЕS MОDULЕS EN PSEUDО-СОDE <br>
 
 Cettе anneхе présente, pоur chаque mоdule de chаque étаpе du pipelinе,
 l’algоrithme sоus fоrmе d’instructiоns numérоtéеs (Entrée, Sоrtie, initiаlisatiоn,
