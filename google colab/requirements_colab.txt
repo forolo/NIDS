@@ -1,0 +1,7 @@
+# Colab fournit déjà torch, numpy, pandas, scikit-learn, matplotlib, psutil.
+# Le carnet installe seulement :
+xgboost
+pyarrow
+networkx
+scikit-learn
+matplotlib
