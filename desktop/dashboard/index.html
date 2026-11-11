@@ -1,0 +1,273 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tableau de bord NIDS</title>
+<style>
+:root{
+  --bg:#f6f7f9; --card:#ffffff; --ink:#1c2430; --muted:#5b6675; --line:#dde2e9; --accent:#2457c5; --accent-ink:#ffffff;
+  --ok:#1f7a4d; --ok-bg:#e3f4ea; --warn:#a15c00; --warn-bg:#fdf0d8; --bad:#b3261e; --bad-bg:#fbe7e5;
+  --lock:#6b7480; --lock-bg:#eceff3; --run:#8a5a00; --run-bg:#fff1cc; --code-bg:#0f1720; --code-ink:#d7e2ee;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --bg:#10151c; --card:#171e27; --ink:#e6ebf2; --muted:#9aa6b6; --line:#2a3441; --accent:#6c9bff; --accent-ink:#0b1220;
+    --ok:#6fd49c; --ok-bg:#15301f; --warn:#f0b259; --warn-bg:#33270f; --bad:#ff8c84; --bad-bg:#3a1a18;
+    --lock:#98a3b3; --lock-bg:#222b37; --run:#f5c75c; --run-bg:#34290c; --code-bg:#0a0f15; --code-ink:#cfe0f2;
+  }
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+.wrap{max-width:1020px;margin:0 auto;padding:20px 16px 80px}
+header{display:flex;flex-wrap:wrap;gap:12px;align-items:center;justify-content:space-between;margin-bottom:6px}
+h1{font-size:22px;margin:0}
+.sub{color:var(--muted);font-size:13px;margin:2px 0 14px}
+button{font:inherit;cursor:pointer;border-radius:8px;border:1px solid var(--line);background:var(--card);color:var(--ink);padding:7px 13px}
+button:hover:not(:disabled){border-color:var(--accent)}
+button:disabled{opacity:.45;cursor:not-allowed}
+button.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-weight:600}
+button.danger{background:var(--bad);color:#fff;border-color:var(--bad)}
+.panel{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px 16px;margin-bottom:14px}
+.progress{height:10px;background:var(--lock-bg);border-radius:6px;overflow:hidden;margin:8px 0 2px}
+.progress>div{height:100%;background:var(--ok);transition:width .4s}
+.row{display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:12px}
+label{display:block;font-size:12px;color:var(--muted);margin-bottom:3px}
+input[type=text],input[type=number],select{width:100%;font:inherit;padding:7px 9px;border-radius:8px;border:1px solid var(--line);background:var(--bg);color:var(--ink)}
+.group{margin:22px 0 8px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.step{background:var(--card);border:1px solid var(--line);border-left:5px solid var(--lock);border-radius:12px;padding:12px 14px;margin-bottom:10px}
+.step.s-termine{border-left-color:var(--ok)}
+.step.s-disponible{border-left-color:var(--accent)}
+.step.s-en_cours{border-left-color:var(--run)}
+.step.s-a_refaire{border-left-color:var(--warn)}
+.step.s-echec,.step.s-interrompu{border-left-color:var(--bad)}
+.step.s-verrouille{opacity:.72}
+.top{display:flex;gap:12px;align-items:flex-start;justify-content:space-between;flex-wrap:wrap}
+.num{display:inline-block;min-width:26px;text-align:center;font-weight:700;color:var(--muted)}
+.title{font-weight:650;font-size:16px}
+.what{color:var(--muted);font-size:13.5px;margin:2px 0 0 0}
+.chip{display:inline-block;font-size:12px;padding:2px 9px;border-radius:999px;font-weight:600;white-space:nowrap}
+.c-termine{background:var(--ok-bg);color:var(--ok)} .c-disponible{background:#e6eefc;color:var(--accent)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .c-disponible{background:#1b2a47}}
+.c-en_cours{background:var(--run-bg);color:var(--run)} .c-a_refaire{background:var(--warn-bg);color:var(--warn)}
+.c-echec,.c-interrompu{background:var(--bad-bg);color:var(--bad)} .c-verrouille{background:var(--lock-bg);color:var(--lock)}
+.tags{display:flex;gap:6px;flex-wrap:wrap;margin-top:6px}
+.tag{font-size:11.5px;border:1px solid var(--line);border-radius:6px;padding:1px 7px;color:var(--muted)}
+.tag.test{border-color:var(--warn);color:var(--warn)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;align-items:center}
+.meta{font-size:12.5px;color:var(--muted)}
+.note{font-size:13px;margin-top:8px;padding:7px 10px;border-radius:8px;background:var(--lock-bg);color:var(--ink)}
+.note.warn{background:var(--warn-bg);color:var(--warn)}
+pre.cmd,pre.log{background:var(--code-bg);color:var(--code-ink);border-radius:8px;padding:10px 12px;overflow:auto;font:12.5px/1.45 ui-monospace,Consolas,monospace;margin:8px 0 0;white-space:pre-wrap;word-break:break-all}
+pre.log{max-height:300px;white-space:pre}
+.spin{display:inline-block;width:12px;height:12px;border:2px solid currentColor;border-right-color:transparent;border-radius:50%;animation:sp .8s linear infinite;vertical-align:-2px;margin-right:5px}
+@keyframes sp{to{transform:rotate(360deg)}}
+.job{position:sticky;top:8px;z-index:5;border-color:var(--run);box-shadow:0 4px 18px rgba(0,0,0,.12)}
+dialog{border:1px solid var(--line);border-radius:14px;background:var(--card);color:var(--ink);width:min(960px,94vw);max-height:88vh;padding:0}
+dialog::backdrop{background:rgba(0,0,0,.45)}
+.dhead{display:flex;justify-content:space-between;align-items:center;padding:12px 16px;border-bottom:1px solid var(--line);position:sticky;top:0;background:var(--card)}
+.dbody{padding:14px 18px 22px;overflow:auto;max-height:calc(88vh - 56px)}
+.md h1,.md h2,.md h3,.md h4{margin:16px 0 6px} .md h1{font-size:19px} .md h2{font-size:17px} .md h3,.md h4{font-size:15px}
+.md table{border-collapse:collapse;font-size:13px;margin:8px 0;display:block;overflow:auto}
+.md th,.md td{border:1px solid var(--line);padding:4px 9px;text-align:left;white-space:nowrap} .md th{background:var(--lock-bg)}
+.md code{background:var(--lock-bg);padding:1px 5px;border-radius:4px;font-size:12.5px}
+.md pre{background:var(--code-bg);color:var(--code-ink);padding:10px;border-radius:8px;overflow:auto}
+.md img,.imgs img{max-width:100%;border:1px solid var(--line);border-radius:8px;margin:8px 0}
+.docname{font-size:12px;color:var(--muted);margin-top:14px}
+.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:var(--bad);color:#fff;padding:9px 16px;border-radius:10px;display:none;z-index:20;max-width:90vw}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Tableau de bord du pipeline NIDS</h1>
+      <div class="sub" id="root"></div>
+    </div>
+    <div style="display:flex;gap:8px"><button id="btnCfg">Configuration</button></div>
+  </header>
+
+  <div class="panel">
+    <div style="display:flex;justify-content:space-between;gap:10px;flex-wrap:wrap"><strong id="progTxt"></strong><span class="meta" id="progMeta"></span></div>
+    <div class="progress"><div id="progBar" style="width:0%"></div></div>
+    <div class="meta">Chaque étape ne s'active que lorsque les étapes obligatoires précédentes sont terminées. Une étape est « terminée » lorsque ses fichiers de sortie existent.</div>
+  </div>
+
+  <div class="panel" id="cfgPanel" style="display:none">
+    <div class="row">
+      <div><label>Dossier des CSV bruts</label><input type="text" id="cCsv"></div>
+      <div><label>Dispositif de calcul</label><select id="cDev"><option value="cuda">GPU (cuda)</option><option value="cpu">CPU</option></select></div>
+      <div><label>Graines (séparées par des virgules)</label><input type="text" id="cSeeds"></div>
+      <div><label>Graine de la tête (explicabilité, temps réel)</label><select id="cHead"></select></div>
+      <div><label>Fraction d'étiquettes (0,1 = 10 %)</label><input type="number" id="cFrac" step="0.01" min="0.001" max="1"></div>
+      <div><label>Arguments de GNNExplainer (« --option valeur »)</label><input type="text" id="cGnn" placeholder="relevés dans reports/xai_gnn_tune_s0.md"></div>
+    </div>
+    <label style="margin-top:12px;display:flex;gap:8px;align-items:center;color:var(--ink);font-size:14px"><input type="checkbox" id="cFree"> Mode libre : ignorer l'ordre chronologique (déconseillé)</label>
+    <div class="actions"><button class="primary" id="cSave">Enregistrer</button><span class="meta" id="cMsg"></span></div>
+  </div>
+
+  <div class="panel job" id="jobPanel" style="display:none">
+    <div style="display:flex;justify-content:space-between;gap:10px;align-items:center;flex-wrap:wrap">
+      <strong id="jobTitle"></strong>
+      <div style="display:flex;gap:8px;align-items:center"><span class="meta" id="jobMeta"></span><button class="danger" id="btnStop">Arrêter</button></div>
+    </div>
+    <pre class="log" id="jobLog"></pre>
+  </div>
+
+  <div id="steps"></div>
+</div>
+
+<dialog id="dlg">
+  <div class="dhead"><strong id="dTitle"></strong><button id="dClose">Fermer</button></div>
+  <div class="dbody" id="dBody"></div>
+</dialog>
+<div class="toast" id="toast"></div>
+
+<script>
+const TOKEN = "__TOKEN__";
+const LABEL = {verrouille:"Verrouillée", disponible:"Disponible", en_cours:"En cours", termine:"Terminée", a_refaire:"À refaire", echec:"Échec", interrompu:"Interrompue"};
+let state = null, openCmds = new Set(), cfgDirty = false;
+
+const $ = id => document.getElementById(id);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+
+function toast(msg){ const t=$("toast"); t.textContent=msg; t.style.display="block"; clearTimeout(t._t); t._t=setTimeout(()=>t.style.display="none",5000); }
+
+async function api(path, body){
+  const opt = body === undefined ? {} : {method:"POST", headers:{"Content-Type":"application/json","X-Token":TOKEN}, body:JSON.stringify(body)};
+  const r = await fetch(path, opt);
+  const j = await r.json().catch(()=>({error:"réponse illisible"}));
+  if(!r.ok) throw new Error(j.error || r.statusText);
+  return j;
+}
+
+/* ---- rendu Markdown minimal et sûr (tout est échappé) ---- */
+function inline(s){
+  s = esc(s);
+  s = s.replace(/`([^`]+)`/g,"<code>$1</code>").replace(/\*\*([^*]+)\*\*/g,"<strong>$1</strong>").replace(/(^|[^*])\*([^*\s][^*]*)\*/g,"$1<em>$2</em>");
+  return s;
+}
+function md(src){
+  const L = src.replace(/\r/g,"").split("\n"); let o=[], i=0;
+  while(i<L.length){
+    const l=L[i];
+    if(/^```/.test(l)){ let b=[]; i++; while(i<L.length && !/^```/.test(L[i])) b.push(L[i++]); i++; o.push("<pre>"+esc(b.join("\n"))+"</pre>"); continue; }
+    let m=/^(#{1,4})\s+(.*)$/.exec(l);
+    if(m){ o.push(`<h${m[1].length}>${inline(m[2])}</h${m[1].length}>`); i++; continue; }
+    if(/^\s*\|.*\|\s*$/.test(l) && i+1<L.length && /^\s*\|[\s:|-]+\|\s*$/.test(L[i+1])){
+      const row = s => s.trim().replace(/^\||\|$/g,"").split("|").map(c=>c.trim());
+      let h=row(l); i+=2; let rows=[]; while(i<L.length && /^\s*\|.*\|\s*$/.test(L[i])) rows.push(row(L[i++]));
+      o.push("<table><thead><tr>"+h.map(c=>`<th>${inline(c)}</th>`).join("")+"</tr></thead><tbody>"+rows.map(r=>"<tr>"+r.map(c=>`<td>${inline(c)}</td>`).join("")+"</tr>").join("")+"</tbody></table>"); continue; }
+    if(/^\s*[-*]\s+/.test(l)){ let it=[]; while(i<L.length && /^\s*[-*]\s+/.test(L[i])) it.push(L[i++].replace(/^\s*[-*]\s+/,"")); o.push("<ul>"+it.map(x=>`<li>${inline(x)}</li>`).join("")+"</ul>"); continue; }
+    if(!l.trim()){ i++; continue; }
+    let p=[]; while(i<L.length && L[i].trim() && !/^(#{1,4}\s|```|\s*[-*]\s+|\s*\|)/.test(L[i])) p.push(L[i++]);
+    if(!p.length){ p.push(L[i++]); }
+    o.push("<p>"+inline(p.join(" "))+"</p>");
+  }
+  return o.join("\n");
+}
+
+/* ---- rendu des étapes ---- */
+function stepHTML(s){
+  const prog = s.total > 1 ? ` · ${s.done}/${s.total} graines` : "";
+  const canRun = ["disponible","a_refaire","echec","interrompu","termine"].includes(s.status) || (state.config.free_mode && s.status==="verrouille" && !s.blocked_reason);
+  const busy = state.job && state.job.running;
+  const label = s.status==="termine" ? "Relancer" : (s.status==="a_refaire" ? "Refaire" : "Lancer");
+  let notes = "";
+  if(s.status==="verrouille") notes += `<div class="note">${s.blocked_reason ? esc(s.blocked_reason) : "À terminer d'abord : "+esc(s.waiting_for[0])+(s.waiting_for.length>1?" (puis "+(s.waiting_for.length-1)+" autre"+(s.waiting_for.length>2?"s":"")+")":"")}</div>`;
+  if(s.status==="a_refaire") notes += `<div class="note warn">Une étape dont elle dépend a été refaite après elle : ses résultats sont peut-être périmés.</div>`;
+  if(s.needs) notes += `<div class="note warn">${esc(s.needs)}</div>`;
+  if(s.last && s.last.status==="failed" && s.status!=="termine") notes += `<div class="note warn">Dernier lancement échoué (code ${esc(s.last.rc)}) — voir le journal.</div>`;
+  const last = s.last && s.last.ended ? `Dernier lancement : ${esc(s.last.ended)}${s.last.seconds!=null?` · ${s.last.seconds} s`:""} · ${s.last.status==="ok"?"réussi":esc(s.last.status)}` : "";
+  const cmds = openCmds.has(s.id) ? `<pre class="cmd">${s.commands.map(esc).join("\n")}</pre>` : "";
+  return `<div class="step s-${s.status}" data-id="${s.id}">
+    <div class="top">
+      <div style="flex:1;min-width:220px"><span class="num">${s.id}</span><span class="title">${esc(s.title)}</span>
+        <p class="what">${esc(s.what)}</p>
+        <div class="tags">${s.optional?'<span class="tag">optionnelle</span>':''}${s.long?'<span class="tag">longue</span>':''}${s.reads_test?'<span class="tag test" title="Cette étape lit l\'ensemble de test : ses sorties ne doivent pas servir à régler le modèle.">lit le test</span>':''}</div></div>
+      <div style="text-align:right"><span class="chip c-${s.status}">${s.status==="en_cours"?'<span class="spin"></span>':''}${LABEL[s.status]}${esc(prog)}</span></div>
+    </div>
+    ${notes}
+    <div class="actions">
+      <button class="${s.status==="disponible"||s.status==="a_refaire"?"primary":""}" data-run="${s.id}" ${(!canRun||busy||(!s.commands.length))?"disabled":""}>${label}</button>
+      <button data-rep="${s.id}" ${(s.done>0||s.last)?"":"disabled"}>Rapport et journal</button>
+      <button data-cmd="${s.id}">${openCmds.has(s.id)?"Masquer":"Commandes"}</button>
+      <span class="meta">${last}</span>
+    </div>${cmds}
+  </div>`;
+}
+
+function render(){
+  const d = state;
+  $("root").textContent = "Projet : " + d.root;
+  const p = d.progress; $("progTxt").textContent = `${p.done} étape${p.done>1?"s":""} obligatoire${p.done>1?"s":""} terminée${p.done>1?"s":""} sur ${p.total}`;
+  $("progMeta").textContent = d.config.free_mode ? "Mode libre actif" : "Mode chronologique";
+  $("progBar").style.width = (100*p.done/Math.max(p.total,1)) + "%";
+  let h = "", cur = null;
+  for(const s of d.steps){ if(s.group!==cur){ cur=s.group; h += `<div class="group">${esc(cur)}</div>`; } h += stepHTML(s); }
+  $("steps").innerHTML = h;
+  const j = d.job, jp = $("jobPanel");
+  if(j && j.running){
+    jp.style.display = "block"; $("jobTitle").innerHTML = `<span class="spin"></span>Étape ${j.step} : ${esc(j.title)}`;
+    $("jobMeta").textContent = "démarrée " + (j.started||""); const lg=$("jobLog"); const atEnd = lg.scrollTop+lg.clientHeight>=lg.scrollHeight-30;
+    lg.textContent = j.log || "(en attente de sortie…)"; if(atEnd) lg.scrollTop = lg.scrollHeight;
+  } else jp.style.display = "none";
+  if(!cfgDirty) fillCfg(d.config);
+}
+
+function fillCfg(c){
+  $("cCsv").value=c.csv_dir; $("cDev").value=c.device; $("cSeeds").value=c.seeds.join(", "); $("cFrac").value=c.fraction;
+  $("cGnn").value=c.gnn_args; $("cFree").checked=c.free_mode;
+  const hs=$("cHead"); hs.innerHTML=c.seeds.map(s=>`<option value="${s}" ${s===c.head_seed?"selected":""}>${s}</option>`).join("");
+}
+
+async function refresh(){
+  try{ state = await api("/api/overview"); render(); }catch(e){ /* serveur arrêté */ }
+}
+
+document.addEventListener("click", async ev => {
+  const b = ev.target.closest("button"); if(!b) return;
+  try{
+    if(b.dataset.run){
+      const s = state.steps.find(x=>x.id==b.dataset.run);
+      if(s.status==="termine" || s.status==="a_refaire"){ if(!confirm(`Relancer l'étape ${s.id} (${s.title}) ? Ses sorties existantes seront écrasées.`)) return; }
+      if(s.long && !confirm(`L'étape ${s.id} peut durer longtemps. Lancer ?`)) return;
+      await api("/api/run",{id:+b.dataset.run}); await refresh();
+    } else if(b.dataset.cmd){ const id=+b.dataset.cmd; openCmds.has(id)?openCmds.delete(id):openCmds.add(id); render(); }
+    else if(b.dataset.rep){ await showReport(+b.dataset.rep); }
+  }catch(e){ toast(e.message); }
+});
+
+async function showReport(id){
+  const s = state.steps.find(x=>x.id===id);
+  $("dTitle").textContent = `Étape ${id} : ${s.title}`;
+  let html = "";
+  try{
+    const r = await api("/api/report?id="+id);
+    for(const dc of r.docs){ html += `<div class="docname">${esc(dc.name)}</div><div class="md">${md(dc.text)}${dc.truncated?'<p class="meta">… affichage tronqué.</p>':''}</div>`; }
+    if(r.images.length) html += `<div class="imgs">${r.images.map(p=>`<div class="docname">${esc(p)}</div><img src="/files/${encodeURI(p)}" alt="${esc(p)}">`).join("")}</div>`;
+  }catch(e){ html += `<p class="meta">${esc(e.message)}</p>`; }
+  if(s.last && s.last.log){
+    try{ const lg = await api("/api/log?name="+encodeURIComponent(s.last.log)); html += `<div class="docname">Journal du dernier lancement (${esc(s.last.log)})</div><pre class="log">${esc(lg.text)}</pre>`; }catch(e){}
+  }
+  if(!html) html = '<p class="meta">Aucun rapport ni journal disponible pour cette étape.</p>';
+  $("dBody").innerHTML = html; $("dlg").showModal();
+}
+$("dClose").onclick = () => $("dlg").close();
+$("btnCfg").onclick = () => { const p=$("cfgPanel"); p.style.display = p.style.display==="none"?"block":"none"; };
+$("btnStop").onclick = async () => { try{ await api("/api/stop",{}); }catch(e){ toast(e.message); } };
+for(const id of ["cCsv","cDev","cSeeds","cHead","cFrac","cGnn","cFree"]) $(id).addEventListener("input",()=>cfgDirty=true);
+$("cSeeds").addEventListener("change",()=>{ const seeds=$("cSeeds").value.split(/[\s,;]+/).filter(Boolean).map(Number).filter(Number.isInteger); if(seeds.length){ $("cHead").innerHTML=seeds.map(s=>`<option value="${s}">${s}</option>`).join(""); } });
+$("cSave").onclick = async () => {
+  try{
+    state = await api("/api/config",{csv_dir:$("cCsv").value, device:$("cDev").value, seeds:$("cSeeds").value, head_seed:+$("cHead").value,
+      fraction:+$("cFrac").value, gnn_args:$("cGnn").value, free_mode:$("cFree").checked});
+    cfgDirty=false; $("cMsg").textContent="Enregistré."; setTimeout(()=>$("cMsg").textContent="",2500); render();
+  }catch(e){ toast(e.message); }
+};
+
+refresh();
+setInterval(()=>{ if(!$("dlg").open) refresh(); }, 2000);
+</script>
+</body>
+</html>
